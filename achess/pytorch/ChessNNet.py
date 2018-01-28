@@ -13,7 +13,7 @@ from torch.autograd import Variable
 class ChessNNet(nn.Module):
     def __init__(self, game, args):
         # game params
-        self.board_x, self.board_y, self.board_z = game.getBoardSize()
+        self.board_z, self.board_x, self.board_y = game.getBoardSize()
         self.action_size = game.getActionSize()
         self.args = args
 
@@ -40,7 +40,7 @@ class ChessNNet(nn.Module):
 
     def forward(self, s):
         #                                                           s: batch_size x board_x x board_y
-        s = s.view(-1, 1, self.board_x, self.board_y)                # batch_size x 1 x board_x x board_y
+        s = s.view(-1, self.board_z, self.board_x, self.board_y)                # batch_size x 1 x board_x x board_y
         s = F.relu(self.bn1(self.conv1(s)))                          # batch_size x num_channels x board_x x board_y
         s = F.relu(self.bn2(self.conv2(s)))                          # batch_size x num_channels x board_x x board_y
         s = F.relu(self.bn3(self.conv3(s)))                          # batch_size x num_channels x (board_x-2) x (board_y-2)
@@ -53,4 +53,5 @@ class ChessNNet(nn.Module):
         pi = self.fc3(s)                                                                         # batch_size x action_size
         v = self.fc4(s)                                                                          # batch_size x 1
 
-        return F.log_softmax(pi, dim=1), F.tanh(v)
+        #return F.log_softmax(pi, dim=1), F.tanh(v)
+        return F.log_softmax(pi), F.tanh(v)

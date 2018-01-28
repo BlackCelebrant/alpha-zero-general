@@ -5,11 +5,13 @@ import numpy as np
 import chess
 
 from Game import Game
-from achess.chess_utils import create_uci_labels
+from achess.ChessUtils import create_uci_labels, canon_input_planes, flip_fen
 
-
-N_ACTIONS = len(create_uci_labels())
-BOARD_SIZE = (8, 8, 18)
+labels = create_uci_labels()
+idx2act = {k:v for k, v in enumerate(labels)}
+act2idx = {v:k for k,v in idx2act.items()}
+n_actions = len(labels)
+board_size = (18, 8, 8)
 
 
 class ChessGame(Game):
@@ -26,24 +28,28 @@ class ChessGame(Game):
         return chess.Board()
     
     def getBoardSize(self):
-        return BOARD_SIZE
+        return board_size
     
     def getActionSize(self):
-        return N_ACTIONS
+        return n_actions
     
     def getNextState(self, board, player, action):
-        board.push_uci(action)
+        board.push_uci(idx2act[action])
         return (board, -player)
         
     def getValidMoves(self, board, player):
-        return [str(a) for a in board.legal_moves]
+        valid = [str(a) for a in board.legal_moves]
+        mask = np.zeros(n_actions)
+        for action in valid:
+            mask[act2idx[action]] = 1
+        return mask
     
     def getGameEnded(self, board, player):
         """
         Return 0 if not ended, 1 if player 1 won, -1 if player 1 lost.
-        TODO: check condition for draw.
+        TODO: check condition for draw..
         """
-        result = self.board.result(claim_draw = True)
+        result = board.result(claim_draw = True)
         if result == '1-0':
             return 1
         elif result == '0-1':
@@ -55,15 +61,19 @@ class ChessGame(Game):
         
     def getCanonicalForm(self, board, player):
         """
-        TODO: convert "fen" to actual state.
+        Return instance of Board class that is flipped for Black.
         """
-        flip = player == -1
-        return np.zeros((8, 8, 18))
+        if player == -1:
+            board = chess.Board(flip_fen(board.fen(), flip=True))
+        return board
     
     def getSymmetries(self, board, pi):
-        return None
+        return [board, pi]
     
     def stringRepresentation(self, board):
+        """
+        Converting board to string (they will be keys in dictionary).
+        """
         return board.fen()
         
         

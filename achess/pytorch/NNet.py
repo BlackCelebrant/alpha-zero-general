@@ -7,6 +7,7 @@ import numpy as np
 import math
 import sys
 sys.path.append('../../')
+sys.path.append('..')
 from utils import *
 from pytorch_classification.utils import Bar, AverageMeter
 from NeuralNet import NeuralNet
@@ -18,6 +19,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torchvision import datasets, transforms
 from torch.autograd import Variable
+from achess.ChessUtils import canon_input_planes
 
 from .ChessNNet import ChessNNet as chnet
 
@@ -26,14 +28,14 @@ args = dotdict({
     'dropout': 0.3,
     'epochs': 10,
     'batch_size': 64,
-    'cuda': torch.cuda.is_available(),
+    'cuda': False, #torch.cuda.is_available(),
     'num_channels': 512,
 })
 
 class NNetWrapper(NeuralNet):
     def __init__(self, game):
         self.nnet = chnet(game, args)
-        self.board_x, self.board_y, self.board_z = game.getBoardSize()
+        self.board_z, self.board_x, self.board_y = game.getBoardSize()
         self.action_size = game.getActionSize()
 
         if args.cuda:
@@ -44,6 +46,9 @@ class NNetWrapper(NeuralNet):
         examples: list of examples, each example is of form (board, pi, v)
         """
         optimizer = optim.Adam(self.nnet.parameters())
+        
+        ##################
+        examples = [(canon_input_planes(x[0].fen()), x[1], x[2]) for x in examples]
 
         for epoch in range(args.epochs):
             print('EPOCH ::: ' + str(epoch+1))
@@ -113,12 +118,15 @@ class NNetWrapper(NeuralNet):
         """
         # timing
         start = time.time()
+        
+        ##################
+        board = canon_input_planes(board.fen())
 
         # preparing input
         board = torch.FloatTensor(board.astype(np.float64))
         if args.cuda: board = board.contiguous().cuda()
         board = Variable(board, volatile=True)
-        board = board.view(1, self.board_x, self.board_y)
+        board = board.view(self.board_z, self.board_x, self.board_y)
 
         self.nnet.eval()
         pi, v = self.nnet(board)
