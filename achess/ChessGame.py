@@ -34,8 +34,16 @@ class ChessGame(Game):
         return n_actions
     
     def getNextState(self, board, player, action):
-        board.push_uci(idx2act[action])
-        return (board, -player)
+        if player == 1:
+            b = chess.Board(board.fen())
+        else:
+            b = chess.Board(flip_fen(board.fen(), flip=True))
+        b.push_uci(idx2act[action])
+        if player == 1:
+            b = chess.Board(b.fen())
+        else:
+            b = chess.Board(flip_fen(b.fen(), flip=True))
+        return (b, -player)
         
     def getValidMoves(self, board, player):
         valid = [str(a) for a in board.legal_moves]
@@ -68,7 +76,7 @@ class ChessGame(Game):
         return board
     
     def getSymmetries(self, board, pi):
-        return [board, pi]
+        return [[board, pi]]
     
     def stringRepresentation(self, board):
         """
