@@ -68,7 +68,7 @@ def flip_fen(fen, flip=False):
             return a.lower() if a.isupper() else a.upper()
         return a
     def swapall(aa):
-        return "".join([swapcase(a) for a in aa])
+        return "".join([swapcase(a) for a in aa[::-1]])
     return "/".join([swapall(row) for row in reversed(rows)]) \
         + " " + ('w' if foo[1] == 'b' else 'b') \
         + " " + "".join(sorted(swapall(foo[2]))) \
