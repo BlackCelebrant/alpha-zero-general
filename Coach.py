@@ -4,6 +4,7 @@ from MCTS import MCTS
 import numpy as np
 from pytorch_classification.utils import Bar, AverageMeter
 import time
+from achess.ChessGame import idx2act
 
 class Coach():
     """
@@ -44,17 +45,30 @@ class Coach():
             temp = int(episodeStep < self.args.tempThreshold)
 
             pi = self.mcts.getActionProb(canonicalBoard, temp=temp)
+            #print(len(np.where(np.array(pi) > 0)[0]))
             sym = self.game.getSymmetries(canonicalBoard, pi)
             for b,p in sym:
                 trainExamples.append([b, self.curPlayer, p, None])
 
             action = np.random.choice(len(pi), p=pi)
+
+            #print(self.board.fen())
+            #self.print_possible_moves(pi)
+            #print('Move:{}'.format(idx2act[action]))
+            #print('\n')
+
             self.board, self.curPlayer = self.game.getNextState(self.board, self.curPlayer, action)
 
             r = self.game.getGameEnded(self.board, self.curPlayer)
 
             if r!=0:
+                import pdb; pdb.set_trace()
+                print(self.board.fen())
                 return [(x[0],x[2],r*((-1)**(x[1]!=self.curPlayer))) for x in trainExamples]
+
+    def print_possible_moves(self, pi):
+        #print(np.array(pi)[np.array(pi) > 0])
+        print('Possible:'+','.join([idx2act[i] for i in np.where(np.array(pi) > 0)[0]]))
 
     def learn(self):
         """
@@ -106,4 +120,95 @@ class Coach():
             else:
                 print('ACCEPTING NEW MODEL')
                 self.nnet.save_checkpoint(folder=self.args.checkpoint, filename='checkpoint_' + str(i) + '.pth.tar')
-                self.nnet.save_checkpoint(folder=self.args.checkpoint, filename='best.pth.tar')                
+                self.nnet.save_checkpoint(folder=self.args.checkpoint, filename='best.pth.tar')
+
+
+import os
+from achess.pytorch.NNet import NNetWrapper as nn
+from achess.ChessGame import ChessGame as Game
+
+class MCoach():
+    def __init__(self, game, nnet, args):
+        self.game = game
+        self.board = game.getInitBoard()
+        self.nnet = nnet
+        self.args = args
+
+    @staticmethod
+    def executeEpisode(args_list):
+        nnet = args_list[0]
+        args = args_list[1]
+        start = time.time()
+        pid = os.getpid()
+        np.random.seed(pid)
+        game = Game()
+        mcts = MCTS(game, nnet, args)   # reset search tree
+        trainExamples = []
+        board = game.getInitBoard()
+        curPlayer = 1
+        episodeStep = 0
+
+        while True:
+            episodeStep += 1
+            canonicalBoard = game.getCanonicalForm(board, curPlayer)
+            temp = int(episodeStep < args.tempThreshold)
+
+            pi = mcts.getActionProb(canonicalBoard, temp=temp)
+            #print(len(np.where(np.array(pi) > 0)[0]))
+            sym = game.getSymmetries(canonicalBoard, pi)
+            for b,p in sym:
+                trainExamples.append([b, curPlayer, p, None])
+
+            action = np.random.choice(len(pi), p=pi)
+
+            #print(board.fen())
+            #self.print_possible_moves(pi)
+            #print('Move:{}'.format(idx2act[action]))
+            #print('\n')
+
+            board, curPlayer = game.getNextState(board, curPlayer, action)
+
+            r = game.getGameEnded(board, curPlayer)
+
+            if r!=0:
+                #print(board.fen())
+                print(time.time()-start)
+                return [(x[0],x[2],r*((-1)**(x[1]!=curPlayer))) for x in trainExamples]
+
+    def learn(self):
+        # TODO: play episodes in processes
+        from queue import Queue
+        import multiprocessing
+        multiprocessing.set_start_method('spawn')
+        pool = multiprocessing.Pool(processes=6)
+        start = time.time()
+        res = pool.map(self.executeEpisode, [[self.nnet, self.args]]*100)
+        print('Total: {}'.format(time.time()-start))
+
+        trainExamples = [i for sl in res for i in sl]
+        self.nnet.save_checkpoint(folder=self.args.checkpoint, filename='temp.pth.tar')
+        pnet = self.nnet.__class__(self.game)
+        pnet.load_checkpoint(folder=self.args.checkpoint, filename='temp.pth.tar')
+        pmcts = MCTS(self.game, pnet, self.args)
+        self.nnet.train(trainExamples)
+        nmcts = MCTS(self.game, self.nnet, self.args)
+
+        print('PITTING AGAINST PREVIOUS VERSION')
+        arena = Arena(lambda x: np.argmax(pmcts.getActionProb(x, temp=0)),
+                      lambda x: np.argmax(nmcts.getActionProb(x, temp=0)), self.game)
+        pwins, nwins, draws = arena.playGames(self.args.arenaCompare)
+
+        print('NEW/PREV WINS : ' + str(nwins) + '/' + str(pwins) + ' ; DRAWS : ' + str(draws))
+        if pwins+nwins > 0 and float(nwins)/(pwins+nwins) < self.args.updateThreshold:
+            print('REJECTING NEW MODEL')
+            self.nnet = pnet
+
+        else:
+            print('ACCEPTING NEW MODEL')
+            #self.nnet.save_checkpoint(folder=self.args.checkpoint, filename='checkpoint_' + str(i) + '.pth.tar')
+            self.nnet.save_checkpoint(folder=self.args.checkpoint, filename='best.pth.tar')
+
+def test(a):
+    import os
+    print(os.getpid())
+
