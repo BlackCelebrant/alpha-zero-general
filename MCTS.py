@@ -43,6 +43,15 @@ class MCTS():
         probs = [x/float(sum(counts)) for x in counts]
         return probs
 
+    @staticmethod
+    def softmax(z):
+        assert len(z.shape) == 2
+        s = np.max(z, axis=1)
+        s = s[:, np.newaxis]  # necessary step to do broadcasting
+        e_x = np.exp(z - s)
+        div = np.sum(e_x, axis=1)
+        div = div[:, np.newaxis]  # dito
+        return e_x / div
 
     def search(self, canonicalBoard):
         """
@@ -74,7 +83,8 @@ class MCTS():
 
         if s not in self.Ps:
             # leaf node
-            self.Ps[s], v = self.nnet.predict(canonicalBoard)
+            #self.Ps[s], v = self.nnet.predict(canonicalBoard)
+            self.Ps[s], v = self.softmax(np.array([np.random.rand(1968)]))[0], np.random.rand()
             valids = self.game.getValidMoves(canonicalBoard, 1)
             self.Ps[s] = self.Ps[s]*valids      # masking invalid moves
             self.Ps[s] /= np.sum(self.Ps[s])    # renormalize

@@ -83,10 +83,3 @@ class ChessGame(Game):
         Converting board to string (they will be keys in dictionary).
         """
         return board.fen()
-        
-        
-        
-        
-        
-        
-    

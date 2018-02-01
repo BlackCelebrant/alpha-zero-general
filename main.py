@@ -5,7 +5,7 @@ from utils import *
 
 args = dotdict({
     'numIters': 1000,
-    'numEps': 100,
+    'numEps': 1,
     'tempThreshold': 15,
     'updateThreshold': 0.6,
     'maxlenOfQueue': 200000,
@@ -24,5 +24,9 @@ if __name__=="__main__":
     if args.load_model:
         nnet.load_checkpoint(args.load_folder_file[0], args.load_folder_file[1])
 
-    c = Coach(g, nnet, args)
-    c.learn()
+    t = []
+    for i in range(10):
+        c = Coach(g, nnet, args)
+        t.append(c.learn())
+    import numpy as np
+    print(np.mean(t))

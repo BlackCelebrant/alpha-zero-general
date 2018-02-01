@@ -11,6 +11,7 @@ class Coach():
     in Game and NeuralNet. args are specified in main.py.
     """
     def __init__(self, game, nnet, args):
+        np.random.seed(1)
         self.game = game
         self.board = game.getInitBoard()
         self.nnet = nnet
@@ -54,6 +55,8 @@ class Coach():
             r = self.game.getGameEnded(self.board, self.curPlayer)
 
             if r!=0:
+                print(episodeStep)
+                print(self.board.fen())
                 return [(x[0],x[2],r*((-1)**(x[1]!=self.curPlayer))) for x in trainExamples]
 
     def learn(self):
@@ -84,6 +87,7 @@ class Coach():
                                                                                                            total=bar.elapsed_td, eta=bar.eta_td)
                 bar.next()
             bar.finish()
+            return eps_time.avg
 
             # training new network, keeping a copy of the old one
             self.nnet.save_checkpoint(folder=self.args.checkpoint, filename='temp.pth.tar')
