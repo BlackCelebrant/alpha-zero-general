@@ -123,9 +123,9 @@ class Coach():
                 self.nnet.save_checkpoint(folder=self.args.checkpoint, filename='best.pth.tar')
 
 
-import os
-from achess.pytorch.NNet import NNetWrapper as nn
+import multiprocessing
 from achess.ChessGame import ChessGame as Game
+
 
 class MCoach():
     def __init__(self, game, nnet, args):
@@ -138,9 +138,9 @@ class MCoach():
     def executeEpisode(args_list):
         nnet = args_list[0]
         args = args_list[1]
+        seed = args_list[2]
         start = time.time()
-        pid = os.getpid()
-        np.random.seed(pid)
+        np.random.seed(seed)
         game = Game()
         mcts = MCTS(game, nnet, args)   # reset search tree
         trainExamples = []
@@ -171,18 +171,18 @@ class MCoach():
             r = game.getGameEnded(board, curPlayer)
 
             if r!=0:
-                #print(board.fen())
+                print(board.fen())
                 print(time.time()-start)
                 return [(x[0],x[2],r*((-1)**(x[1]!=curPlayer))) for x in trainExamples]
 
     def learn(self):
         # TODO: play episodes in processes
-        from queue import Queue
-        import multiprocessing
         multiprocessing.set_start_method('spawn')
-        pool = multiprocessing.Pool(processes=6)
+        pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
         start = time.time()
-        res = pool.map(self.executeEpisode, [[self.nnet, self.args]]*100)
+        pool_args = zip([self.nnet]*self.args.numEps, [self.args]*self.args.numEps,
+                        range(self.args.numEps))
+        res = pool.map(self.executeEpisode, pool_args)
         print('Total: {}'.format(time.time()-start))
 
         trainExamples = [i for sl in res for i in sl]
